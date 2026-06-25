@@ -18,8 +18,8 @@ def test_version_is_defined():
     assert isinstance(pytac.__version__, str) and pytac.__version__
 
 
-def test_default_tac_config_path_points_into_package():
-    path = pytac.DEFAULT_TAC_CONFIG_PATH
+def test_package_tac_config_path_points_into_package():
+    path = pytac.PACKAGE_TAC_CONFIG_PATH
     assert os.path.basename(path) == "tac_configs"
     assert path.startswith(os.path.dirname(pytac.__file__))
     assert os.path.isdir(path)
