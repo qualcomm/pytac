@@ -97,6 +97,38 @@ def test_create_board_dispatches_bughopper_v2_with_hid(patch_usb_find, monkeypat
         assert name in board.quick_methods
 
 
+def test_bughopper_v2_hid_writes_prefix_report_id(patch_usb_find, monkeypatch):
+    """Every HID write must begin with a 0x00 report-ID placeholder.
+
+    hidapi consumes byte 0 of a write as the HID report ID. Without the 0x00
+    prefix the command byte is swallowed as a (non-existent) report ID on
+    Windows and the firmware never sees the GPIO command (the board silently
+    fails to reboot). Assert the payload survives intact behind the prefix.
+    """
+    device = make_usb_device(
+        Board.ID_VENDOR_BUGHOPPER_V2, Board.ID_PRODUCT_BUGHOPPER_V2, "S6"
+    )
+    patch_usb_find(device)
+
+    hid_device = MagicMock(name="hid_device")
+    hid_device.serial = "S6"
+    fake_hid = types.ModuleType("hid")
+    fake_hid.Device = MagicMock(return_value=hid_device)
+
+    monkeypatch.setitem(sys.modules, "hid", fake_hid)
+    monkeypatch.setattr(debugboard, "hid", fake_hid, raising=False)
+
+    board = Board.create_board("S6", "./tac_configs")
+    board.bootToEDL()
+
+    writes = [call.args[0] for call in hid_device.write.call_args_list]
+    assert writes, "bootToEDL wrote nothing"
+    for payload in writes:
+        assert payload[0] == 0x00, f"missing report-ID prefix: {list(payload)}"
+        # byte 1 is the application command (CMD_GPIO), not stripped as report ID
+        assert payload[1] == board.CMD_GPIO
+
+
 # Required quick methods the PIC32CX config script defines and the test invokes.
 PIC32CX_CONFIG = "TAC_PIC32CXAuto_54.tcnf"
 PIC32CX_METHODS = ("powerOn", "powerOff", "bootToEDL")
