@@ -448,7 +448,13 @@ class BughopperV2Board(Board):
         self.VOL_DOWN_BIT = 0x8
 
     def _hid_set_bitmode(self, command, gpio_value, mask=0xF):
-        self.usb_device.write(bytes([command, gpio_value, mask]))
+        # The leading 0x00 is the HID report-ID placeholder for this unnumbered
+        # RawHID report. hidapi always consumes byte 0 of a write as the report
+        # ID: Linux/hidraw tolerates its absence, but on Windows the command
+        # byte would be swallowed as a (non-existent) report ID and stripped,
+        # so the firmware never sees the GPIO command. Prepending 0x00 keeps the
+        # [command, gpio_value, mask] payload intact on every platform.
+        self.usb_device.write(bytes([0x00, command, gpio_value, mask]))
 
     def powerOn(self):
         logger.debug("Power cycle to normal boot mode")
