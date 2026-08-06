@@ -40,7 +40,19 @@ sudo dnf install -y hidapi
 
 ## USB permissions
 
-By default, USB devices are not accessible without root. Create a udev rule for your board:
+By default, USB devices are not accessible without root. The easiest way to set
+this up is the `installudevrules` subcommand, which installs a rule for every
+board type pytac knows (including the Bughopper V2 `hidraw` rule) into
+`/etc/udev/rules.d/99-pytac.rules` and reloads udev:
+
+    pytac installudevrules
+
+When not run as root it escalates only the privileged steps through `sudo`, so
+it works with a pipx-installed pytac. Use `--dry-run` to print the generated
+rules without installing them, and `--rules-path <file>` to install them
+somewhere else.
+
+Alternatively, create a udev rule for your board by hand:
 
     echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="05c6", ATTR{idProduct}=="9302", MODE="0666", GROUP="plugdev"' \
       | sudo tee /etc/udev/rules.d/99-alpaca.rules
