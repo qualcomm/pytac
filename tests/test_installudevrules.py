@@ -10,7 +10,10 @@ system's udev configuration.
 
 import sys
 
+import pytest
+
 from pytac import installudevrules
+from pytac.cli import build_parser
 from pytac.debugboard import Board
 
 
@@ -92,3 +95,21 @@ def test_install_unprivileged_escalates_via_sudo(monkeypatch, tmp_path):
     cmds = [cmd for cmd, _ in calls]
     assert ["sudo", "udevadm", "control", "--reload-rules"] in cmds
     assert ["sudo", "udevadm", "trigger"] in cmds
+
+
+def test_parser_accepts_installudevrules_on_linux(monkeypatch):
+    monkeypatch.setattr(sys, "platform", "linux")
+    parser = build_parser()
+    args = parser.parse_args(["installudevrules", "--dry-run"])
+    assert args.mode == "installudevrules"
+    assert args.dry_run is True
+    assert args.rules_path is None
+
+
+@pytest.mark.parametrize("platform", ["darwin", "win32"])
+def test_parser_rejects_installudevrules_off_linux(monkeypatch, capsys, platform):
+    monkeypatch.setattr(sys, "platform", platform)
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["installudevrules"])
+    assert "invalid choice" in capsys.readouterr().err
