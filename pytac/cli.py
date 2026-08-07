@@ -141,6 +141,40 @@ def _list_boards():
         print(f"  {board['type']:<14} vid:pid={vid_pid}  serial={serial}")
 
 
+def _single_board_serial(boards):
+    if not boards:
+        return None, "no connected debug boards found"
+
+    if len(boards) > 1:
+        serials = ", ".join(
+            board.get("serial") or "<no serial reported>" for board in boards
+        )
+        return None, f"multiple connected debug boards found: {serials}"
+
+    serial = boards[0].get("serial")
+    if not serial:
+        return None, "the connected debug board did not report a serial number"
+
+    return serial, None
+
+
+def _resolve_serial(args, parser, command):
+    if args.serial:
+        return args.serial[0]
+
+    if args.config_file_path:
+        return None
+
+    from .debugboard import Board
+
+    serial, error = _single_board_serial(Board.list_boards())
+    if serial:
+        logger.info("Using only connected debug board serial %s", serial)
+        return serial
+
+    parser.error(f"{command} requires --serial or --config-file-path ({error})")
+
+
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -165,11 +199,9 @@ def main(argv=None):
 
         run_service(args.serial, args.tac_config_path, args.hostname, args.port)
     elif args.mode == "oneshot":
-        if not args.serial and not args.config_file_path:
-            parser.error("oneshot requires --serial or --config-file-path")
         from .shell import run_oneshot
 
-        serial = args.serial[0] if args.serial else None
+        serial = _resolve_serial(args, parser, "oneshot")
         run_oneshot(
             args.command,
             serial,
@@ -178,11 +210,9 @@ def main(argv=None):
             args.value,
         )
     else:  # shell
-        if not args.serial and not args.config_file_path:
-            parser.error("shell requires --serial or --config-file-path")
         from .shell import run_shell
 
-        serial = args.serial[0] if args.serial else None
+        serial = _resolve_serial(args, parser, "shell")
         run_shell(serial, args.config_file_path, args.tac_config_path)
 
 
