@@ -109,6 +109,25 @@ def build_parser():
         help="Path within the repository holding the configs (default: %(default)s)",
     )
 
+    # udev only exists on Linux; don't offer the subcommand elsewhere.
+    if sys.platform == "linux":
+        installudevrules = subparsers.add_parser(
+            "installudevrules",
+            parents=[base],
+            help="Install udev rules granting access to all known debug boards "
+            "(uses sudo when not run as root)",
+        )
+        installudevrules.add_argument(
+            "--rules-path",
+            help="File to write the rules to "
+            "(default: /etc/udev/rules.d/99-pytac.rules)",
+        )
+        installudevrules.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Print the generated rules to stdout without installing them",
+        )
+
     service = subparsers.add_parser(
         "service", parents=[base, common], help="Run the REST API service"
     )
@@ -192,6 +211,10 @@ def main(argv=None):
             args.ref,
             args.repository_path,
         )
+    elif args.mode == "installudevrules":
+        from .installudevrules import install_udev_rules
+
+        install_udev_rules(args.rules_path, args.dry_run)
     elif args.mode == "service":
         if not args.serial:
             parser.error("service requires --serial")
