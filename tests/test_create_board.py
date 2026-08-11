@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 from conftest import CONFIG_DIR, make_usb_device
 
-from pytac import debugboard
+from pytactl import debugboard
 
 Board = debugboard.Board
 

@@ -1,20 +1,20 @@
-# pytac test suite
+# pytactl test suite
 
 Tests that every config file under `tac_configs/` can be loaded through the same
-code path `pytac.shell` and `pytac.service` use — `Board.create_board()` — with
+code path `pytactl.shell` and `pytactl.service` use — `Board.create_board()` — with
 the USB device, GPIO and serial hardware mocked, and that each board exposes the
 required quick methods (`powerOn`, `powerOff`, `bootToEDL`).
 
-The code under test lives in the `pytac` package (`pytac/debugboard.py` etc.), so
-the tests import it as `from pytac import debugboard`.
+The code under test lives in the `pytactl` package (`pytactl/debugboard.py` etc.), so
+the tests import it as `from pytactl import debugboard`.
 
 ## Configs under test
 
 The data-driven tests run over the `.tcnf` files in a `tac_configs/` directory at
 the repo root. Only `TAC_FTDI_13.tcnf` ships bundled inside the package
-(`pytac/tac_configs/`); the full config set lives upstream in
+(`pytactl/tac_configs/`); the full config set lives upstream in
 [qcom-test-automation-controller](https://github.com/qualcomm/qcom-test-automation-controller)
-and is fetched with `pytac installconfigs`. Populate `tac_configs/` before running
+and is fetched with `pytactl installconfigs`. Populate `tac_configs/` before running
 (the `config-loading` CI workflow does this automatically from upstream):
 
 ```sh

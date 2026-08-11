@@ -1,15 +1,15 @@
-# PyTAC
+# pytactl
 
 Python implementation of Test Automation Controller (TAC/Alpaca) for controlling Qualcomm debug boards.
 It uses config files and PSOC firmware from the original TAC (Alpaca) system.
 
 # Installation
 
-Install the `pytac` command on your system with [pipx](https://pipx.pypa.io):
+Install the `pytactl` command on your system with [pipx](https://pipx.pypa.io):
 
     pipx install .
 
-This puts a single `pytac` entry point on your `PATH`. Note that the `hid`
+This puts a single `pytactl` entry point on your `PATH`. Note that the `hid`
 dependency needs `libhidapi` package to be installed (required for Bughopper V2 boards).
 
 Alternatively, for development in a virtualenv:
@@ -18,12 +18,12 @@ Alternatively, for development in a virtualenv:
     . ./venv/bin/activate
     pip install -e .
 
-Run `pytac -h` to see all available options.
+Run `pytactl -h` to see all available options.
 
 ## System dependencies
 
-PyTAC uses `hidapi` for HID-based debug boards, including Bughopper V2.
-Install the native HIDAPI library before installing or running `pytac`.
+pytactl uses `hidapi` for HID-based debug boards, including Bughopper V2.
+Install the native HIDAPI library before installing or running `pytactl`.
 
 ### Ubuntu / Debian
 
@@ -62,19 +62,19 @@ Then make sure your user is in the `plugdev` group (log out and back in after):
 config files.
 
 **All other debug boards (FTDI, PSOC) require configuration files** that are NOT shipped with
-pytac. The easiest way to obtain them is the `installconfigs` subcommand, which downloads every
+pytactl. The easiest way to obtain them is the `installconfigs` subcommand, which downloads every
 `.tcnf` file and `devicelist.json` from the
 [qcom-test-automation-controller](https://github.com/qualcomm/qcom-test-automation-controller/tree/main/configurations)
 project:
 
-    pytac installconfigs
+    pytactl installconfigs
 
 With no arguments it fetches from the default config repository and installs into a per-user
 data directory (resolved with [platformdirs](https://pypi.org/project/platformdirs/), e.g.
-`~/.local/share/pytac` on Linux). Once that directory is populated, the board subcommands use it
+`~/.local/share/pytactl` on Linux). Once that directory is populated, the board subcommands use it
 automatically as the default `--tac-config-path`. Override either with:
 
-    pytac installconfigs \
+    pytactl installconfigs \
       --config-repository https://github.com/qualcomm/qcom-test-automation-controller/ \
       --local-path /path/to/install \
       --ref main \
@@ -87,7 +87,7 @@ directory within the repository to fetch from (default `configurations`).
 file) in as `default.tcnf` and rewrites empty `configPath` entries in `devicelist.json` to point
 at it.
 
-You can also copy the `configurations/` directory by hand and point pytac at it with
+You can also copy the `configurations/` directory by hand and point pytactl at it with
 `--tac-config-path <dir>`.
 
 Note: some configs in qcom-test-automation-controller currently have syntax issues; pick the
@@ -110,7 +110,7 @@ the `--tac-config-path` directory for FTDI/PSOC boards. Example entry for a PSOC
 The `--serial` argument takes the USB serial number, not a device path. The easiest way to
 discover connected boards and their serial numbers is the `list` subcommand:
 
-    pytac list
+    pytactl list
 
 It prints every recognised debug board with its type, USB vendor/product ID, and serial number
 (read from udev, the same `ID_SERIAL_SHORT` value you pass to `--serial`):
@@ -131,7 +131,7 @@ Or using `lsusb` (replace `VID:PID` with `0403:6011` for FTDI or `05c6:9302` for
 
 Start the interactive shell with the `shell` subcommand:
 
-    pytac shell --serial <ID_SERIAL_SHORT>
+    pytactl shell --serial <ID_SERIAL_SHORT>
 
 Optional arguments:
 
@@ -170,20 +170,20 @@ Type `help` in the shell to list all commands available for your specific board.
 Use the `oneshot` subcommand to run one command and exit, without entering the interactive
 shell. This is handy for scripting:
 
-    pytac oneshot bootToEDL --serial <ID_SERIAL_SHORT>
-    pytac oneshot reset --serial <ID_SERIAL_SHORT>
+    pytactl oneshot bootToEDL --serial <ID_SERIAL_SHORT>
+    pytactl oneshot reset --serial <ID_SERIAL_SHORT>
 
 GPIO pin commands take an integer value (`1` to assert, `0` to deassert):
 
-    pytac oneshot pkey 1 --serial <ID_SERIAL_SHORT>
-    pytac oneshot pkey 0 --serial <ID_SERIAL_SHORT>
+    pytactl oneshot pkey 1 --serial <ID_SERIAL_SHORT>
+    pytactl oneshot pkey 0 --serial <ID_SERIAL_SHORT>
 
 The same commands available in the shell can be used here. An unknown command exits with an
 error listing the commands supported by your board.
 
 # Using as a service
 
-    pytac service --serial <ID_SERIAL_SHORT_1> [<ID_SERIAL_SHORT_2> ...]
+    pytactl service --serial <ID_SERIAL_SHORT_1> [<ID_SERIAL_SHORT_2> ...]
 
 The REST API runs on `http://localhost:5000`. Example usage with curl:
 
@@ -213,4 +213,4 @@ Note: REST API server runs in debug mode. Running with multiple concurrent threa
 
 # License
 
-pytac is licensed under the [BSD-3-clause License](https://spdx.org/licenses/BSD-3-Clause.html). See [LICENSE](LICENSE) for the full license text.
+pytactl is licensed under the [BSD-3-clause License](https://spdx.org/licenses/BSD-3-Clause.html). See [LICENSE](LICENSE) for the full license text.

@@ -521,7 +521,7 @@ class FtdiBoard(Board):
         if not os.path.exists(conf):
             logger.warning(
                 "%s not found in %s; falling back to TAC_FTDI_13.tcnf. "
-                "Run 'pytac installconfigs' to install the full config set.",
+                "Run 'pytactl installconfigs' to install the full config set.",
                 DEFAULT_CONFIG_FILENAME,
                 tac_config_path,
             )

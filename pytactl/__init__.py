@@ -13,7 +13,7 @@ __version__ = "1.4.0"
 PACKAGE_TAC_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "tac_configs")
 
 # Where "installconfigs" writes the full config set by default.
-INSTALLED_TAC_CONFIG_PATH = platformdirs.user_data_dir("pytac")
+INSTALLED_TAC_CONFIG_PATH = platformdirs.user_data_dir("pytactl")
 
 # Default config repository fetched by "installconfigs".
 DEFAULT_CONFIG_REPOSITORY = (

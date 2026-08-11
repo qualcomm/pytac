@@ -6,7 +6,7 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pytac"
+name = "pytactl"
 version = "1.4.0"
 description = "Python Test Automation Controller (TAC/Alpaca) for Qualcomm debug boards"
 readme = "README.md"
@@ -28,16 +28,16 @@ dependencies = [
 dev = ["ruff==0.15.17", "pytest"]
 
 [project.scripts]
-pytac = "pytac.cli:main"
+pytactl = "pytactl.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/qualcomm/pytac"
+Homepage = "https://github.com/qualcomm/pytactl"
 
 [tool.setuptools]
-packages = ["pytac"]
+packages = ["pytactl"]
 
 [tool.setuptools.package-data]
-pytac = ["tac_configs/*"]
+pytactl = ["tac_configs/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
