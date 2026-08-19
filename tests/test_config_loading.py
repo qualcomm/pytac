@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """Tests that every config file can be loaded through the USB-description based
-dispatch in ``pytac.debugboard`` (the same path used by ``pytac.shell`` and
-``pytac.service``) and exposes the required quick methods: powerOn, powerOff,
+dispatch in ``pytactl.debugboard`` (the same path used by ``pytactl.shell`` and
+``pytactl.service``) and exposes the required quick methods: powerOn, powerOff,
 bootToEDL.
 
 Special-cased configs (excluded boards, known-broken configs, configs that omit
@@ -115,7 +115,7 @@ def test_ftdi_falls_back_to_default_config(
     13, that 'installconfigs' installs under that name)."""
     from conftest import FTDI_PRODUCT, FTDI_VENDOR, make_usb_device
 
-    from pytac import debugboard
+    from pytactl import debugboard
 
     config_dir, _ = prepared_configs
     device = make_usb_device(

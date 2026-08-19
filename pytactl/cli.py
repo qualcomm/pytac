@@ -25,7 +25,7 @@ def _setup_logging(level):
 
 def build_parser():
     parser = ArgumentParser(
-        prog="pytac",
+        prog="pytactl",
         description="Test Automation Controller (TAC/Alpaca) for Qualcomm debug boards.",
     )
     parser.add_argument(
@@ -96,7 +96,7 @@ def build_parser():
     installconfigs.add_argument(
         "--local-path",
         help="Directory to install configs into (default: the platformdirs "
-        "user data directory for pytac)",
+        "user data directory for pytactl)",
     )
     installconfigs.add_argument(
         "--ref",

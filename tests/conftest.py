@@ -1,11 +1,11 @@
 # Copyright (c) 2026 Qualcomm Technologies, Inc. and/or its subsidiaries.
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Shared fixtures and helpers for the pytac test suite.
+"""Shared fixtures and helpers for the pytactl test suite.
 
 The tests mock the USB layer (and the underlying GPIO/serial hardware) so that
 every config file under ``tac_configs/`` can be loaded through the exact same
-code path that ``pytac.shell`` and ``pytac.service`` use:
+code path that ``pytactl.shell`` and ``pytactl.service`` use:
 ``Board.create_board()``.
 
 A handful of configs are deliberately handled specially (see the maps below):
@@ -30,12 +30,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import pytac
-from pytac import debugboard
+import pytactl
+from pytactl import debugboard
 
-# Where "pytac installconfigs" installs the config set by default
-# (platformdirs user data dir for pytac).
-CONFIG_DIR = pytac.INSTALLED_TAC_CONFIG_PATH
+# Where "pytactl installconfigs" installs the config set by default
+# (platformdirs user data dir for pytactl).
+CONFIG_DIR = pytactl.INSTALLED_TAC_CONFIG_PATH
 
 # USB vendor/product pairs that Board.create_board() dispatches on.
 FTDI_VENDOR = debugboard.Board.ID_VENDOR_FTDI  # 0x0403
@@ -206,8 +206,8 @@ def prepared_configs(tmp_path_factory):
     # config as default.tcnf, the file FtdiBoard falls back to when a device's
     # USB descriptor matches no catalog entry.
     shutil.copy(
-        os.path.join(pytac.PACKAGE_TAC_CONFIG_PATH, "TAC_FTDI_13.tcnf"),
-        os.path.join(dst, pytac.DEFAULT_CONFIG_FILENAME),
+        os.path.join(pytactl.PACKAGE_TAC_CONFIG_PATH, "TAC_FTDI_13.tcnf"),
+        os.path.join(dst, pytactl.DEFAULT_CONFIG_FILENAME),
     )
 
     for path in discover_configs():
@@ -230,7 +230,7 @@ def prepared_configs(tmp_path_factory):
             # FTDI (and any other FTDI-USB board): FtdiBoard matches
             # catalog["usb_descriptor"] against device.product. Use a unique
             # synthetic descriptor per file.
-            descriptor = f"PYTAC_TEST::{base}"
+            descriptor = f"PYTACTL_TEST::{base}"
             catalog.append(
                 {"usb_descriptor": descriptor, "configPath": f"tac_configs/{base}"}
             )
