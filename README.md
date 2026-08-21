@@ -5,7 +5,12 @@ It uses config files and PSOC firmware from the original TAC (Alpaca) system.
 
 # Installation
 
-Install the `pytactl` command on your system with [pipx](https://pipx.pypa.io):
+Install the `pytactl` command on your system from [PyPI](https://pypi.org/project/pytactl/)
+with [pipx](https://pipx.pypa.io):
+
+    pipx install pytactl
+
+To install from a checkout of this repository instead:
 
     pipx install .
 

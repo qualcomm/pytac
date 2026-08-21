@@ -2,16 +2,46 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytactl"
-version = "1.4.0"
+dynamic = ["version"]
 description = "Python Test Automation Controller (TAC/Alpaca) for Qualcomm debug boards"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "BSD-3-Clause" }
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Qualcomm Technologies, Inc.", email = "qc.opensource@qti.qualcomm.com" },
+]
+maintainers = [
+    { name = "Milosz Wasilewski", email = "milosz.wasilewski@oss.qualcomm.com" },
+]
+keywords = [
+    "debug-board",
+    "hardware",
+    "qualcomm",
+    "tac",
+    "test-automation",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Embedded Systems",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Hardware",
+]
 dependencies = [
     "Flask",
     "Flask-RESTful",
@@ -32,9 +62,17 @@ pytactl = "pytactl.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/qualcomm/pytactl"
+Repository = "https://github.com/qualcomm/pytactl"
+Issues = "https://github.com/qualcomm/pytactl/issues"
+Documentation = "https://github.com/qualcomm/pytactl/blob/main/README.md"
+"Security Policy" = "https://github.com/qualcomm/pytactl/blob/main/SECURITY.md"
 
 [tool.setuptools]
 packages = ["pytactl"]
+
+# Single source of truth for the version: pytactl/__init__.py
+[tool.setuptools.dynamic]
+version = { attr = "pytactl.__version__" }
 
 [tool.setuptools.package-data]
 pytactl = ["tac_configs/*"]
