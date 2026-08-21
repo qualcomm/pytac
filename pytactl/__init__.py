@@ -5,7 +5,7 @@ import os
 
 import platformdirs
 
-__version__ = "1.4.0"
+__version__ = "2.0.0"
 
 # Configs bundled with the package. Only the synthesized FTDI Alpaca-Lite
 # default (TAC_FTDI_13.tcnf) ships here; the full config set (every .tcnf plus
