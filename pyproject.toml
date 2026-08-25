@@ -65,6 +65,7 @@ Homepage = "https://github.com/qualcomm/pytactl"
 Repository = "https://github.com/qualcomm/pytactl"
 Issues = "https://github.com/qualcomm/pytactl/issues"
 Documentation = "https://github.com/qualcomm/pytactl/blob/main/README.md"
+Changelog = "https://github.com/qualcomm/pytactl/blob/main/CHANGELOG.md"
 "Security Policy" = "https://github.com/qualcomm/pytactl/blob/main/SECURITY.md"
 
 [tool.setuptools]
