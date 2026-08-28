@@ -10,16 +10,34 @@ the tests import it as `from pytactl import debugboard`.
 
 ## Configs under test
 
-The data-driven tests run over the `.tcnf` files in a `tac_configs/` directory at
-the repo root. Only `TAC_FTDI_13.tcnf` ships bundled inside the package
-(`pytactl/tac_configs/`); the full config set lives upstream in
-[qcom-test-automation-controller](https://github.com/qualcomm/qcom-test-automation-controller)
-and is fetched with `pytactl installconfigs`. Populate `tac_configs/` before running
-(the `config-loading` CI workflow does this automatically from upstream):
+The data-driven tests run over the `.tcnf` files of the full config set, which is
+**not part of this repository**. Only `TAC_FTDI_13.tcnf` ships bundled inside the
+package (`pytactl/tac_configs/`); the full set lives upstream in
+[qcom-test-automation-controller](https://github.com/qualcomm/qcom-test-automation-controller).
+`tests/conftest.py` looks for it in two places, in order:
+
+1. `$PYTACTL_TAC_CONFIG_DIR`, if set — an explicit override, for distro packagers
+   and anyone who unpacks the config set somewhere of their own choosing.
+2. `pytactl.INSTALLED_TAC_CONFIG_PATH` — where `pytactl installconfigs` writes it
+   (the `config-loading` CI workflow does this automatically from upstream).
+
+So either
 
 ```sh
-mkdir -p tac_configs && cp /path/to/upstream/configurations/* tac_configs/
+pytactl installconfigs
 ```
+
+or
+
+```sh
+export PYTACTL_TAC_CONFIG_DIR=/path/to/upstream/configurations
+```
+
+If neither holds any `.tcnf` file, every config-dependent test **skips** with a
+reason naming both options, and the remainder of the suite (imports, CLI parser,
+`create_board()` dispatch for Bughopper, …) still runs. That keeps the suite green
+in isolated build environments with no network access, such as a distro package
+build — see [issue #22](https://github.com/qualcomm/pytactl/issues/22).
 
 ## Running
 
@@ -30,7 +48,8 @@ python -m pytest
 ```
 
 The exact pass/xfail counts track the upstream config set under test; a typical
-run is in the order of **~184 passed, 1 skipped, 34 xfailed**.
+run with the configs present is in the order of **~184 passed, 1 skipped,
+34 xfailed**. Without them, expect roughly **8 passed, 11 skipped**.
 
 ## How it works
 

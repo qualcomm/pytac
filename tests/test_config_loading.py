@@ -20,6 +20,7 @@ from conftest import (
     config_params,
     discover_configs,
     load_board,
+    requires_configs,
 )
 
 # Functions that every config script is expected to define (unless explicitly
@@ -27,8 +28,14 @@ from conftest import (
 REQUIRED_FUNCTIONS = ("powerOn", "powerOff", "bootToEDL")
 
 
+@requires_configs
 def test_configs_exist():
-    """Guard against silently testing nothing if tac_configs/ is empty."""
+    """Guard against silently testing nothing if the config dir is present but
+    holds no testable configs.
+
+    Skipped outright when the external config set is unavailable (e.g. a distro
+    build environment); see ``resolve_config_dir`` in conftest.py.
+    """
     assert discover_configs(), "no testable .tcnf config files found"
 
 

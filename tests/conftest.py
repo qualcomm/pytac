@@ -33,9 +33,55 @@ import pytest
 import pytactl
 from pytactl import debugboard
 
-# Where "pytactl installconfigs" installs the config set by default
-# (platformdirs user data dir for pytactl).
-CONFIG_DIR = pytactl.INSTALLED_TAC_CONFIG_PATH
+
+def resolve_config_dir():
+    """Locate the directory holding the full TAC config set, or ``None``.
+
+    The data-driven tests need the upstream config set (every ``.tcnf`` plus
+    ``devicelist.json``), which is *not* part of this repository: it is fetched
+    from qcom-test-automation-controller with "pytactl installconfigs". Only
+    ``TAC_FTDI_13.tcnf`` ships inside the package itself.
+
+    Candidates, in order:
+
+    1. ``$PYTACTL_TAC_CONFIG_DIR`` - explicit override, for distro packagers and
+       anyone who unpacks the config set somewhere of their own choosing.
+    2. ``pytactl.INSTALLED_TAC_CONFIG_PATH`` - where "installconfigs" puts it.
+
+    Returns ``None`` when neither holds any ``.tcnf`` file - e.g. an isolated
+    distro build environment with no network access - so that the config-driven
+    tests skip instead of failing with FileNotFoundError.
+    """
+    for candidate in (
+        os.environ.get("PYTACTL_TAC_CONFIG_DIR"),
+        pytactl.INSTALLED_TAC_CONFIG_PATH,
+    ):
+        if candidate and glob.glob(os.path.join(candidate, "*.tcnf")):
+            return candidate
+    return None
+
+
+# Directory holding the config set under test, or None when it is unavailable.
+CONFIG_DIR = resolve_config_dir()
+
+NO_CONFIGS_REASON = (
+    "TAC config set not available: fetch it with 'pytactl installconfigs' or "
+    "point PYTACTL_TAC_CONFIG_DIR at a directory containing the .tcnf files"
+)
+
+# Skip marker for tests that cannot run without the external config set.
+requires_configs = pytest.mark.skipif(CONFIG_DIR is None, reason=NO_CONFIGS_REASON)
+
+
+def config_path_or_skip(name):
+    """Return the path to config ``name``, skipping the test if it is absent."""
+    if CONFIG_DIR is None:
+        pytest.skip(NO_CONFIGS_REASON)
+    path = os.path.join(CONFIG_DIR, name)
+    if not os.path.isfile(path):
+        pytest.skip(f"{name} not present in {CONFIG_DIR}")
+    return path
+
 
 # USB vendor/product pairs that Board.create_board() dispatches on.
 FTDI_VENDOR = debugboard.Board.ID_VENDOR_FTDI  # 0x0403
@@ -100,7 +146,13 @@ ConfigEntry = namedtuple(
 
 
 def discover_configs():
-    """Return the testable ``.tcnf`` config files (excluding special cases)."""
+    """Return the testable ``.tcnf`` config files (excluding special cases).
+
+    Empty when the external config set is not available (see
+    :func:`resolve_config_dir`).
+    """
+    if CONFIG_DIR is None:
+        return []
     paths = sorted(glob.glob(os.path.join(CONFIG_DIR, "*.tcnf")))
     return [p for p in paths if os.path.basename(p) not in EXCLUDED_CONFIGS]
 
@@ -113,8 +165,13 @@ def config_params(xfail_map=None):
     XPASS and prompts the entry to be removed.
     """
     xfail_map = xfail_map or {}
+    configs = discover_configs()
+    if not configs:
+        # No config set available: emit a single skipped param so the test shows
+        # up as skipped instead of pytest reporting an empty parameter set.
+        return [pytest.param(None, id="no-configs", marks=requires_configs)]
     params = []
-    for path in discover_configs():
+    for path in configs:
         base = os.path.basename(path)
         marks = []
         if base in xfail_map:
@@ -197,7 +254,12 @@ def prepared_configs(tmp_path_factory):
 
     Returns ``(config_dir, entries)`` where ``entries`` maps config basename to
     a :class:`ConfigEntry` describing how to load it via ``create_board``.
+
+    Skips the requesting test when the external config set is unavailable.
     """
+    if CONFIG_DIR is None:
+        pytest.skip(NO_CONFIGS_REASON)
+
     dst = tmp_path_factory.mktemp("tac_configs")
     catalog = []
     entries = {}

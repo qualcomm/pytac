@@ -5,14 +5,13 @@
 plugged-in device onto the correct board implementation."""
 
 import json
-import os
 import shutil
 import sys
 import types
 from unittest.mock import MagicMock
 
 import pytest
-from conftest import CONFIG_DIR, make_usb_device
+from conftest import config_path_or_skip, make_usb_device
 
 from pytactl import debugboard
 
@@ -136,8 +135,12 @@ PIC32CX_METHODS = ("powerOn", "powerOff", "bootToEDL")
 
 def _prepare_pic32cx_config_dir(tmp_path, usb_descriptor):
     """Copy the PIC32CX config into an isolated dir alongside a devicelist.json
-    that maps ``usb_descriptor`` (the serial prefix before "XX") to it."""
-    shutil.copy(os.path.join(CONFIG_DIR, PIC32CX_CONFIG), tmp_path / PIC32CX_CONFIG)
+    that maps ``usb_descriptor`` (the serial prefix before "XX") to it.
+
+    Skips the calling test when the config is not available (it is part of the
+    upstream config set, not of this repository).
+    """
+    shutil.copy(config_path_or_skip(PIC32CX_CONFIG), tmp_path / PIC32CX_CONFIG)
     catalog = {
         "catalog": [
             {
