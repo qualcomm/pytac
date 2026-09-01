@@ -44,6 +44,12 @@ class TACException(Exception):
     detail = "Unable to perform requested operation"
 
 
+class ConfigScriptError(TACException):
+    """A config script pytactl cannot turn into callable board commands."""
+
+    detail = "Unable to parse the board configuration script"
+
+
 class Board(dict):
     ID_VENDOR_FTDI = 0x0403
     ID_PRODUCT_FTDI = 0x6011
@@ -207,10 +213,63 @@ class Board(dict):
             sanitized = f"{sanitized}_"
         return sanitized
 
+    @staticmethod
+    def _check_script_indentation(script):
+        """Require every statement in the script to be indented with one tab.
+
+        TAC config scripts are written with tabs: a ``def`` at column 0 and its
+        body one tab in. pytactl holds configs to that rather than accepting
+        whatever whitespace happens to be there, so that a stray space-indented
+        line is reported against the config instead of being quietly absorbed.
+        ``pytactl convertconfigs`` normalises a config directory to tabs, and
+        the configs shipped with pytactl have been through it.
+        """
+        offenders = []
+        for number, line in enumerate(script.splitlines(), 1):
+            if not line.strip():
+                # Blank lines are not statements, whatever they are made of.
+                continue
+            indent = line[: len(line) - len(line.lstrip())]
+            if indent and indent != "\t":
+                offenders.append(number)
+
+        if offenders:
+            raise ConfigScriptError(
+                "Config script must indent statements with a single tab, but "
+                "line(s) "
+                + ", ".join(str(number) for number in offenders)
+                + " use other whitespace. Run 'pytactl convertconfigs' on the "
+                "config directory to normalise it."
+            )
+
+    def _check_script_commands(self, script):
+        """Warn about commands the script drives that no pin implements.
+
+        Such a command becomes an AttributeError deep inside the config script
+        the first time the board is asked to do something - typically when
+        someone tries to power a board on. Saying so up front, naming the
+        commands, points at the config instead.
+        """
+        defined = set(re.findall(r"^def\s+(\w+)", script, re.MULTILINE))
+        # Driving a pin is "<command> <value>"; a bare "<name>" line calls
+        # another function. delay/logComment are the language's own statements.
+        referenced = set(re.findall(r"^[ \t]+(\w+)[ \t]+\S", script, re.MULTILINE))
+        unbound = sorted(
+            referenced - defined - set(self.commands) - {"delay", "logComment"}
+        )
+        if unbound:
+            logger.warning(
+                "Config script drives %s, which no pin in this config defines; "
+                "the functions using them will fail when called",
+                ", ".join(repr(name) for name in unbound),
+            )
+
     def parse_script(self):
         if self.full_config:
             initial_script = self.full_config["script"]
             new_script = initial_script
+
+            self._check_script_indentation(initial_script)
 
             # Some configs use command names that aren't valid Python
             # identifiers (e.g. "12vpoweroff" starts with a digit). The script
@@ -241,6 +300,22 @@ class Board(dict):
                     var_re = re.compile(rf"\${var_name}")
                     new_script = var_re.sub(variable["default_value"], new_script)
 
+            # A "$name" left over is a variable the script uses but the config
+            # never declares, so there is no value to substitute. Say which,
+            # rather than letting it reach exec() as a syntax error: the value
+            # is a board timing that only the config can supply.
+            undeclared = sorted(set(re.findall(r"\$(\w+)", new_script)))
+            if undeclared:
+                raise ConfigScriptError(
+                    "Config script uses undeclared variable(s) "
+                    + ", ".join(f"${name}" for name in undeclared)
+                    + "; the config declares "
+                    + (
+                        ", ".join(sorted(v["name"] for v in variables if v.get("name")))
+                        or "none"
+                    )
+                )
+
             # remove lines that start with // (// is a valid comment)
             new_script = "\n".join(
                 line
@@ -253,6 +328,11 @@ class Board(dict):
             new_script = fix_comments.sub("\r", new_script)
             fix_comments = re.compile(r"\/\/.*\r")
             new_script = fix_comments.sub("\r", new_script)
+
+            # Keep the script in its own language, with comments and variables
+            # already resolved, for the command check further down: everything
+            # below rewrites it into Python.
+            alpaca_script = new_script
 
             # fix function definitions
             fix_functions = re.compile(r"\(\)[\s]?", re.MULTILINE)
@@ -289,6 +369,8 @@ class Board(dict):
 
             # create pins
             self.create_pins()
+
+            self._check_script_commands(alpaca_script)
 
             # iterate keys explicitly: this is an exec'd namespace and the
             # `.keys()` form is load-bearing here (see config-parsing history)

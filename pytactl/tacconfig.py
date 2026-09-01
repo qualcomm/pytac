@@ -33,6 +33,7 @@ import glob
 import json
 import logging
 import os
+import re
 import subprocess
 
 logger = logging.getLogger()
@@ -137,6 +138,36 @@ def pin_key(key_holder):
     return tuple(
         str(key_holder[field]) for field in PIN_KEY_FIELDS if field in key_holder
     )
+
+
+def normalize_script_indentation(script):
+    """Indent every statement in an Alpaca script with a single tab.
+
+    TAC config scripts are written with tabs: a ``def`` at column 0 and its body
+    one tab in. A handful of upstream configs indent the odd line with spaces
+    instead (TAC_FTDI_51, TAC_FTDI_52 and TAC_FTDI_77 each have two), which the
+    parser rejects - see ``Board.parse_script``, which requires tabs rather than
+    quietly accepting either. Conversion is the import boundary, so that is
+    where the indentation is made canonical.
+
+    Blank lines are left alone; they are not statements. Returns
+    ``(script, lines_changed)``.
+    """
+    if not script:
+        return script, 0
+
+    changed = 0
+
+    def to_tab(match):
+        nonlocal changed
+        if match.group(0) != "\t":
+            changed += 1
+        return "\t"
+
+    # Leading whitespace of a line with content, without touching the line
+    # ending: configs use both LF and CRLF and the parser reads both.
+    normalized = re.sub(r"^[ \t]+(?=\S)", to_tab, script, flags=re.MULTILINE)
+    return normalized, changed
 
 
 def git_source_info(directory):
@@ -448,6 +479,9 @@ def convert_directory(
 ):
     """Convert every TAC config in ``source`` into ``destination``.
 
+    Script indentation is normalised to tabs on the way through, so that what
+    is written out is what `Board.parse_script` requires.
+
     Each ``*.tcnf`` (legacy or already split) becomes a ``*.pinout.json``.
     ``*.pinout.json`` files that have no ``*.tcnf`` beside them are converted
     too, so a directory of upstream pinout files can be installed directly.
@@ -525,6 +559,11 @@ def convert_directory(
             logger.error("Failed to convert %s: %s", name, error)
             failed.append((name, str(error)))
             continue
+
+        script, retabbed = normalize_script_indentation(pinout.get("script", ""))
+        if retabbed:
+            logger.info("%s: re-indented %d script line(s) with tabs", name, retabbed)
+            pinout["script"] = script
 
         if annotate and source_info and (stated_source or SOURCE_FIELD not in pinout):
             pinout = annotate_source(pinout, source_info, name)

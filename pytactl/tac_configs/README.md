@@ -38,6 +38,13 @@ this is that configuration written out. `pytactl installconfigs` copies it into
 the directory it populates as `default.pinout.json`; here it keeps its own name,
 and `devicelist.json` entries with no config of their own point straight at it.
 
+Scripts in these configs indent statements with a single tab, which is what the
+parser requires. `convertconfigs` re-indents on import and logs each file it
+touches; three upstream configs (`TAC_FTDI_51`, `TAC_FTDI_52`, `TAC_FTDI_77`)
+indent two lines each with spaces and are corrected on the way in. If a refresh
+reports re-indentation for a config not on that list, it is worth raising
+upstream.
+
 ## Refreshing
 
 To pull a newer upstream config set into this directory:

@@ -15,8 +15,9 @@ A handful of configs are deliberately handled specially (see the maps below):
 
 * EXCLUDED_CONFIGS   - not driven by the config-script path at all, so the suite
                        does not try to load them through FtdiBoard/PsocBoard.
-* XFAIL_LOAD         - configs that currently fail to parse/exec. Left unchanged
-                       on purpose; tracked as expected failures.
+* XFAIL_LOAD         - configs that fail to parse/exec. Upstream data problems
+                       that cannot be fixed from the config alone; tracked as
+                       expected failures.
 * XFAIL_REQUIRED     - configs that load fine but legitimately omit one or more
                        of powerOn/powerOff/bootToEDL (the README notes that not
                        every board defines every command).
@@ -122,15 +123,21 @@ EXCLUDED_CONFIGS = {
     "TAC_FTDI_80.pinout.json": "Bughopper board, handled by a dedicated board class",
 }
 
-# Configs that currently fail to parse/exec. Intentionally left unchanged.
+# Configs that fail to parse/exec. Upstream data problems: left unchanged here,
+# because fixing one means supplying a value only the board's owner knows.
 XFAIL_LOAD = {
-    "TAC_FTDI_51.pinout.json": "wrong indentation",
-    "TAC_FTDI_52.pinout.json": "wrong indentation",
-    "TAC_FTDI_72.pinout.json": "wrong indentation",
-    "TAC_FTDI_77.pinout.json": "wrong indentation",
+    "TAC_FTDI_72.pinout.json": (
+        "script uses $edl/$uefi/$fastboot but the config declares no variables; "
+        "the delays are board timings only the config can supply"
+    ),
 }
 
 # Configs that load but do not define all three of powerOn/powerOff/bootToEDL.
+# Not defects to fix here: powerOn is not an alias for the powerOnTheDevice most
+# of these do define - across the 28 configs defining both, powerOn calls
+# powerOnTheDevice and then presses the power key for a board-specific hold time
+# - so synthesising one would mean inventing a power-up sequence. The rest name
+# their functions per board (two SoCs, two EDL entries) or have no script at all.
 XFAIL_REQUIRED = {
     "TAC_FTDI_15.pinout.json": "defines bootToEDL only; no powerOn/powerOff",
     "TAC_FTDI_16.pinout.json": "no bootToEDL (board without EDL entry)",
@@ -143,15 +150,25 @@ XFAIL_REQUIRED = {
 
 # Configs whose powerOn/powerOff/bootToEDL drive a command that no pin in the
 # config defines, so the bound quick method raises AttributeError when invoked.
+# Each is an upstream data problem: a script carrying lines for hardware the
+# board does not have (TAC_FTDI_29 is an RF switch box running a phone script;
+# the M.2 modem cards have no power key or volume buttons). Which physical pin
+# to bind - if any - is a question only the board's owner can answer, so these
+# stay as they are. pytactl names the commands in a warning at load time.
 XFAIL_EXECUTE = {
-    "TAC_FTDI_23.pinout.json": "script drives 'pkey'; no pin defines that command",
-    "TAC_FTDI_29.pinout.json": "script drives 'battery'; no pin defines that command",
-    "TAC_FTDI_56.pinout.json": "script drives 'usb1'; no pin defines that command",
-    "TAC_FTDI_65.pinout.json": "script drives 'usb1'; no pin defines that command",
-    "TAC_FTDI_67.pinout.json": "script drives 'usb1'; no pin defines that command",
-    "TAC_FTDI_69.pinout.json": "script drives 'pkey'; no pin defines that command",
-    "TAC_FTDI_72.pinout.json": "wrong indentation; never reaches execution",
-    "TAC_FTDI_73.pinout.json": "script drives 'usb1'; no pin defines that command",
+    "TAC_FTDI_23.pinout.json": "drives pkey/voldn/volup; M.2 card has no such pins",
+    "TAC_FTDI_29.pinout.json": (
+        "phone script on an RF switch box: drives battery/pedl/pkey/sedl/usb0/"
+        "voldn/volup, board only has VC1-VC3"
+    ),
+    "TAC_FTDI_56.pinout.json": "drives usb1; board only defines usb0",
+    "TAC_FTDI_65.pinout.json": "drives sedl/usb1; board defines neither",
+    "TAC_FTDI_67.pinout.json": (
+        "drives sedl/usb1, and sumxs2 which looks like a typo for the board's smuxs2"
+    ),
+    "TAC_FTDI_69.pinout.json": "drives pkey/voldn/volup; M.2 card has no such pins",
+    "TAC_FTDI_72.pinout.json": "undeclared variables; never reaches execution",
+    "TAC_FTDI_73.pinout.json": "drives sedl/usb1; board defines neither",
 }
 
 

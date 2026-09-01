@@ -33,6 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the FTDI Alpaca-Lite default under a name other than `default.pinout.json` -
   as the bundled set does.
 
+### Fixed
+
+- `TAC_FTDI_51`, `TAC_FTDI_52` and `TAC_FTDI_77` now load. Each indents two
+  script lines with spaces where the config format calls for a tab, which made
+  the whole config unloadable. `installconfigs` and `convertconfigs` re-indent
+  scripts with tabs as they import them, logging each file they touch, so the
+  bundled set and anything imported through either command is clean.
+
 ### Changed
 
 - pytactl now loads board configs from `*.pinout.json` - the hardware half of
@@ -54,6 +62,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The port layout of a board driven from a single config file is derived from
   the config's `platform_type` instead of being guessed from the file name, so
   a config file may now be named anything.
+- A script that uses a variable the config never declares (`delay $edl` with no
+  `edl` in `variables`) now raises `ConfigScriptError` naming the variables and
+  what the config does declare, instead of reaching `exec()` as an opaque
+  `SyntaxError`. The value is a board timing only the config can supply, so
+  pytactl says so rather than guessing one.
+- A config script must indent statements with a single tab. The parser rejects
+  anything else with a `ConfigScriptError` naming the offending lines, instead
+  of accepting whatever whitespace is there: indentation is part of the config
+  file format, and a config that breaks it is one to fix. A raw upstream
+  `.tcnf` passed to `--config-file-path` may therefore be rejected where the
+  converted config loads - convert the directory first. A config directory
+  installed by an earlier version may need `installconfigs` re-running.
+- Loading a config warns when its script drives a command no pin defines,
+  naming the commands. Several upstream configs carry lines for hardware the
+  board does not have; that used to surface only as an `AttributeError` from
+  inside the script, typically when someone tried to power a board on.
 - The rule that a pin disabled in the UI gives way to an enabled pin sharing
   its command name now lives in the conversion rather than in board loading.
   `enabled` is a UI field and does not survive into the pinout file, so the

@@ -559,6 +559,75 @@ def test_convert_directory_without_a_devicelist(tmp_path):
 
 
 # --------------------------------------------------------------------------
+# Script indentation
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("name", "script", "expected", "changed"),
+    [
+        ("tabs are left alone", "def a()\n\tbattery 1\n", "def a()\n\tbattery 1\n", 0),
+        ("spaces", "def a()\n    battery 1\n", "def a()\n\tbattery 1\n", 1),
+        (
+            "over-indented",
+            "def a()\n\t\tbattery 1\n",
+            "def a()\n\tbattery 1\n",
+            1,
+        ),
+        (
+            "crlf is preserved",
+            "def a()\r\n    battery 1\r\n",
+            "def a()\r\n\tbattery 1\r\n",
+            1,
+        ),
+        ("blank lines untouched", "def a()\n   \n\tb 1\n", "def a()\n   \n\tb 1\n", 0),
+        ("empty script", "", "", 0),
+    ],
+)
+def test_normalize_script_indentation(name, script, expected, changed):
+    """Conversion is the import boundary, so it is where a script is made to
+    indent with tabs - what `Board.parse_script` requires."""
+    assert tacconfig.normalize_script_indentation(script) == (expected, changed)
+
+
+def test_convert_directory_re_indents_scripts_with_tabs(tmp_path):
+    """TAC_FTDI_51, TAC_FTDI_52 and TAC_FTDI_77 each indent two lines with
+    spaces upstream; importing them yields configs pytactl will load."""
+    source = tmp_path / "configurations"
+    source.mkdir()
+    spaced = dict(LEGACY_CONFIG, script="def powerOn()\n    battery 1\n\tpkey 1\n")
+    write_json(source / "TAC_FTDI_999.tcnf", spaced)
+    destination = tmp_path / "installed"
+
+    tacconfig.convert_directory(str(source), str(destination))
+
+    script = json.loads((destination / "TAC_FTDI_999.pinout.json").read_text())[
+        "script"
+    ]
+    assert script == "def powerOn()\n\tbattery 1\n\tpkey 1\n"
+
+
+@requires_bundled_configs
+def test_bundled_scripts_are_tab_indented():
+    """Every statement in every shipped config is indented with exactly one tab,
+    which is what the parser requires; nothing relies on it being lenient."""
+    offenders = []
+    for path in glob.glob(
+        os.path.join(pytactl.PACKAGE_TAC_CONFIG_PATH, "*" + tacconfig.PINOUT_EXTENSION)
+    ):
+        with open(path) as handle:
+            script = json.load(handle)["script"]
+        for number, line in enumerate(script.splitlines(), 1):
+            if not line.strip():
+                continue
+            indent = line[: len(line) - len(line.lstrip())]
+            if indent and indent != "\t":
+                offenders.append(f"{os.path.basename(path)}:{number}")
+
+    assert not offenders, f"not indented with a single tab: {offenders}"
+
+
+# --------------------------------------------------------------------------
 # Provenance annotation
 # --------------------------------------------------------------------------
 

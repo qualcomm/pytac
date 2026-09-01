@@ -149,6 +149,38 @@ the same command name to two physical pins and disable one of them. The conversi
 drops a disabled pin when an enabled pin claims the same command, so the command keeps driving the
 line it drove before.
 
+### Script indentation
+
+A config's `script` is written in the "Alpaca" automation language: a `def` at column 0
+and its body **indented with a single tab**, with no nested blocks.
+
+    def powerOn()
+    →   battery 1
+    →   delay 800
+    →   pkey 0
+
+pytactl requires that tab. A statement indented with spaces — or with more than one tab —
+is rejected at load time with a `ConfigScriptError` naming the offending lines, rather
+than being quietly accepted: indentation is part of the config file format, and a config
+that does not follow it is a config to fix, not to work around.
+
+`installconfigs` and `convertconfigs` re-indent scripts with tabs as they import them and
+log each file they touch, so configs that come through either command satisfy the rule and
+the set bundled with pytactl already does. Three upstream configs (`TAC_FTDI_51`,
+`TAC_FTDI_52`, `TAC_FTDI_77`) indent two lines each with spaces and are corrected on the
+way in.
+
+This means a **raw** upstream `.tcnf` handed straight to `--config-file-path` may be
+rejected where the converted config loads. That is deliberate — convert the directory
+first:
+
+    pytactl convertconfigs /path/to/qcom-test-automation-controller/configurations \
+      --output /path/to/install
+
+If you are upgrading and a board that used to work now reports a `ConfigScriptError`, your
+installed config directory predates this rule: re-run `pytactl installconfigs`, or
+`pytactl convertconfigs <dir>` to normalise it in place.
+
 ### Provenance annotation
 
 `installconfigs` and `convertconfigs` stamp each config they write with where it came from, in a

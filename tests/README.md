@@ -54,8 +54,8 @@ python -m pytest
 ```
 
 The exact pass/xfail counts track the config set under test; a run against the
-bundled set is in the order of **239 passed, 1 skipped, 37 xfailed**. With the
-configs stripped, expect roughly **46 passed, 15 skipped**.
+bundled set is in the order of **284 passed, 1 skipped, 25 xfailed**. With the
+configs stripped, expect roughly **77 passed, 17 skipped**.
 
 ## How it works
 
@@ -104,6 +104,15 @@ config, no `devicelist.json` entry points at a config the package does not ship,
 config names the same upstream commit — the one `pytactl/tac_configs/README.md` records,
 so the two cannot drift.
 
+### Script parsing tests (`tests/test_script_parsing.py`)
+
+Cover `Board.parse_script` against small synthetic configs: a tab-indented script
+parses, anything else (spaces, mixed, over-indented) is rejected with the offending
+line numbers, CRLF line endings parse, blank lines are not held to the tab rule,
+script variables are substituted and an undeclared one is reported by name, and a
+command the script drives with no pin behind it is warned about without mistaking
+`delay`, `logComment` or a call to another function for one.
+
 ### Dispatch tests (`tests/test_create_board.py`)
 
 `Board.create_board()` routing: no device → `None`, FTDI, PSOC, Bughopper V1,
@@ -126,42 +135,69 @@ Not driven by the config-script path:
 
 ### Expected failures (`xfail`)
 
-**Fail to load** (`XFAIL_LOAD`) — genuinely broken upstream, left unchanged:
+All of these are upstream config data problems. Each needs a value that only the
+board's owner can supply — which physical pin a command drives, or how long a board
+must be held in a state — so they are left as upstream ships them and fixes belong in
+[qcom-test-automation-controller](https://github.com/qualcomm/qcom-test-automation-controller).
+pytactl reports each of them at load time rather than failing obscurely later.
+
+**Fail to load** (`XFAIL_LOAD`):
 
 | Config | Reason |
 |--------|--------|
-| `TAC_FTDI_51.pinout.json` | wrong indentation |
-| `TAC_FTDI_52.pinout.json` | wrong indentation |
-| `TAC_FTDI_72.pinout.json` | wrong indentation |
-| `TAC_FTDI_77.pinout.json` | wrong indentation |
+| `TAC_FTDI_72.pinout.json` | script uses `$edl`/`$uefi`/`$fastboot` but the config declares no variables. Raises `ConfigScriptError` naming them; the delays are board timings only the config can supply |
 
 **Omit a required function** (`XFAIL_REQUIRED`) — load fine but don't define all
-three of `powerOn`/`powerOff`/`bootToEDL` (the README notes not every board
-defines every command):
+three of `powerOn`/`powerOff`/`bootToEDL`:
 
 | Config | Reason |
 |--------|--------|
 | `TAC_FTDI_15.pinout.json` | defines `bootToEDL` only; no `powerOn`/`powerOff` |
-| `TAC_FTDI_16.pinout.json` | no `bootToEDL` (board without EDL entry) |
-| `TAC_FTDI_41.pinout.json` | uses `spowerOn`/`bootToSDXEDL` variants; no `powerOn`/`bootToEDL` |
+| `TAC_FTDI_16.pinout.json` | no `powerOn`/`powerOff` |
+| `TAC_FTDI_41.pinout.json` | two SoCs: `fpowerOn`/`spowerOn`, `bootToAPQEDL`/`bootToSDXEDL`. Which one a plain `powerOn` should mean is a board question |
 | `TAC_FTDI_42.pinout.json` | empty script (SMART LABEL board defines no functions) |
-| `TAC_FTDI_60.pinout.json` | defines `bootToEDL`/`bootToUEFI` only; no `powerOn`/`powerOff` |
+| `TAC_FTDI_60.pinout.json` | defines `reset`/`bootToEDL`/`bootToUEFI` only; no power control |
 | `TAC_PSOC_24.pinout.json` | defines `bootToEDL` variants only; no `powerOn`/`powerOff` |
-| `TAC_PSOC_31.pinout.json` | defines `bootToNADEDL`/`bootToEAPEDL` variants; no `bootToEDL` |
+| `TAC_PSOC_31.pinout.json` | `bootToNADEDL`/`bootToEAPEDL` for two subsystems; no plain `bootToEDL` |
+
+Note that `powerOn` is **not** an alias for the `powerOnTheDevice` most of these do
+define. Across the 28 configs that define both, `powerOn` calls `powerOnTheDevice` and
+*then* presses the power key for a board-specific hold time (800 ms, 3500 ms, …).
+Synthesising the missing one would mean inventing a power-up sequence, so the suite
+records the gap instead.
 
 **Fail to execute** (`XFAIL_EXECUTE`) — define the function, but its script drives a
-command that no pin in the config defines, so the bound method raises
-`AttributeError` when invoked:
+command that no pin in the config defines, so the bound method raises `AttributeError`
+when invoked. pytactl names the commands in a warning at load time:
 
-`TAC_FTDI_23` (`pkey`), `TAC_FTDI_29` (`battery`), `TAC_FTDI_56`, `TAC_FTDI_65`,
-`TAC_FTDI_67`, `TAC_FTDI_73` (`usb1`), `TAC_FTDI_69` (`pkey`). `TAC_FTDI_72` is listed
-too, but never gets that far — it fails to load.
+| Config | Drives, with no pin behind it |
+|--------|-------------------------------|
+| `TAC_FTDI_23`, `TAC_FTDI_69` | `pkey`, `voldn`, `volup` — M.2 modem cards with no buttons |
+| `TAC_FTDI_29` | `battery`, `pedl`, `pkey`, `sedl`, `usb0`, `voldn`, `volup` — a phone script on an RF switch box, whose only pins are `VC1`–`VC3` |
+| `TAC_FTDI_56` | `usb1` — board only defines `usb0` |
+| `TAC_FTDI_65`, `TAC_FTDI_73` | `sedl`, `usb1` |
+| `TAC_FTDI_67` | `sedl`, `usb1`, and `sumxs2` — which looks like a transposition typo for the board's own `smuxs2` |
+| `TAC_FTDI_72` | listed here too, but never gets that far — it fails to load |
 
-## Open issues (not addressed here)
+## Fixed rather than carried
 
-- The `XFAIL_EXECUTE` configs would raise `AttributeError` if their
-  `powerOn`/etc. were called on real hardware — an upstream config question
-  separate from the test work.
+Three configs (`TAC_FTDI_51`, `TAC_FTDI_52`, `TAC_FTDI_77`) used to be carried as
+`XFAIL_LOAD` for "wrong indentation": each indents two script lines with spaces where
+the format calls for a tab, which made the whole config unloadable.
+
+The fix is in the config files, not in the parser. Config scripts indent statements with
+a single tab, `installconfigs`/`convertconfigs` re-indent them on import (logging each
+file they touch), and the parser *requires* the tab — a config that does not follow the
+format is reported against, with the offending line numbers, rather than quietly
+accepted. All three now load and run. See `tests/test_script_parsing.py` for the parser
+side and `test_normalize_script_indentation` / `test_bundled_scripts_are_tab_indented`
+in `tests/test_tacconfig.py` for the import side.
+
+## Notes
+
 - `TAC_PSOC_31` loads because `parse_script` renames pin commands that are not
   valid Python identifiers (e.g. `12vpoweroff` → `_12vpoweroff`) consistently
   in the script and the pin command they bind to.
+- The `XFAIL_EXECUTE` configs would raise `AttributeError` if their
+  `powerOn`/etc. were called on real hardware. pytactl warns about this at load
+  time, naming the commands, so it is visible before a board is driven.
