@@ -16,7 +16,7 @@ import usb
 from pexpect import fdpexpect
 from pyftdi.gpio import GpioAsyncController
 
-from . import DEFAULT_CONFIG_FILENAME
+from . import default_config_file, tacconfig
 
 logger = logging.getLogger()
 
@@ -34,6 +34,9 @@ BITMODE_CBUS = 0x20
 
 # USB ctrl transfer request for FT230X CBUS
 SIO_SET_BITMODE_REQUEST = 0x0B
+
+# platform_type values in a TAC config that describe an FTDI-based board.
+FTDI_PLATFORM_TYPES = ("FTDI", "FT232H")
 
 
 class TACException(Exception):
@@ -190,31 +193,6 @@ class Board(dict):
     def create_pins(self):
         raise NotImplementedError()
 
-    def _enabled_pin_commands(self):
-        # Command names claimed by enabled pins. A disabled pin is only
-        # skipped when its command collides with one of these (see the
-        # create_pins implementations).
-        #
-        # This is computed once, up front, from the full config so the
-        # decision does not depend on the order pins are processed in: a
-        # disabled pin is dropped whether it is seen before or after the
-        # enabled pin it collides with.
-        return {
-            p.get("command")
-            for p in self.full_config.get("pins", [])
-            if p.get("enabled", True)
-        }
-
-    def _skip_disabled_pin(self, pin_config, enabled_commands):
-        # Disabled pins used to be dropped unconditionally to avoid name
-        # collisions when two pins share a command and only one is enabled.
-        # Now a disabled pin is only ignored when it actually collides with
-        # an enabled pin; otherwise it is added like any other pin.
-        return (
-            not pin_config.get("enabled", True)
-            and pin_config.get("command") in enabled_commands
-        )
-
     def create_ports(self):
         raise NotImplementedError()
 
@@ -328,27 +306,26 @@ class DummyBoard(Board):
         self.config_path = config_path
         self.usb_device = lambda: None
         self.usb_device.serial_number = "123456"
-        with open(self.config_path) as cf:
-            self.full_config = json.loads(cf.read())
+        self.full_config = tacconfig.convert_file(self.config_path)
         self.parse_script()
 
     def create_ports(self):
         logger.debug("creating ports")
-        if "FTDI" in self.config_path:
+        # The pinout config names the platform explicitly, so the port layout
+        # no longer has to be guessed from the file name.
+        platform_type = self.full_config.get("platform_type", "")
+        if platform_type in FTDI_PLATFORM_TYPES:
             for p in self.full_config.get("bus"):
                 bus_name = p.get("bus")
                 if p.get("bus_function") == 2:
                     self.ports.update({bus_name: DummyPort(bus_name, "123456")})
 
-        if "PSOC" in self.config_path:
+        if platform_type == "PSOC":
             self.ports.update({0: DummyPort("123456", None)})
 
     def create_pins(self):
         logger.debug("creating pins")
-        enabled_commands = self._enabled_pin_commands()
         for config in self.full_config.get("pins"):
-            if self._skip_disabled_pin(config, enabled_commands):
-                continue
             pin = DummyPin(self, config)
             pin.setPort(self.ports.get(0))
             logger.debug(f"Adding {pin.command}")
@@ -515,17 +492,9 @@ class FtdiBoard(Board):
     def __init__(self, usb_device, tac_config_path):
         Board.__init__(self)
         self.usb_device = usb_device
-        # Default config for FTDI Alpaca-Lite. "installconfigs" installs it as
-        # default.tcnf; the bundled package ships it as TAC_FTDI_13.tcnf.
-        conf = os.path.join(tac_config_path, DEFAULT_CONFIG_FILENAME)
-        if not os.path.exists(conf):
-            logger.warning(
-                "%s not found in %s; falling back to TAC_FTDI_13.tcnf. "
-                "Run 'pytactl installconfigs' to install the full config set.",
-                DEFAULT_CONFIG_FILENAME,
-                tac_config_path,
-            )
-            conf = os.path.join(tac_config_path, "TAC_FTDI_13.tcnf")
+        # Default config for FTDI Alpaca-Lite, used when the board's USB
+        # descriptor matches no catalog entry.
+        conf = default_config_file(tac_config_path)
         f = open(os.path.join(tac_config_path, "devicelist.json"))
         device_list = json.loads(f.read())
         f.close()
@@ -543,9 +512,7 @@ class FtdiBoard(Board):
             logger.error("No matching FTDI config found")
             sys.exit(1)
 
-        f = open(conf, "rb")
-        self.full_config = json.loads(f.read())
-        f.close()
+        self.full_config = tacconfig.convert_file(conf)
         self.parse_script()
 
     def create_ports(self):
@@ -557,10 +524,7 @@ class FtdiBoard(Board):
                 )
 
     def create_pins(self):
-        enabled_commands = self._enabled_pin_commands()
         for p in self.full_config.get("pins"):
-            if self._skip_disabled_pin(p, enabled_commands):
-                continue
             pin = FtdiPin(self, p)
             pin.setPort(self.ports.get(pin.bus))
             logger.debug(f"Adding {pin.command}")
@@ -591,9 +555,7 @@ class PsocBoard(Board):
             logger.error("No matching PSOC config found")
             sys.exit(1)
 
-        f = open(conf, "rb")
-        self.full_config = json.loads(f.read())
-        f.close()
+        self.full_config = tacconfig.convert_file(conf)
         self.parse_script()
         self.quick_methods.update({"devicePowerOn": QuickMethod(self, "devicePowerOn")})
         self.quick_methods.update(
@@ -673,10 +635,7 @@ class PsocBoard(Board):
         self.ports.update({0: PsocPort(self.usb_device.serial_number)})
 
     def create_pins(self):
-        enabled_commands = self._enabled_pin_commands()
         for config in self.full_config.get("pins"):
-            if self._skip_disabled_pin(config, enabled_commands):
-                continue
             pin = PsocPin(self, config)
             pin.setPort(self.ports.get(0))
             logger.debug(f"Adding {pin.command}")
@@ -743,19 +702,14 @@ class Pic32cxBoard(Board):
             )
             sys.exit(1)
 
-        f = open(conf, "rb")
-        self.full_config = json.loads(f.read())
-        f.close()
+        self.full_config = tacconfig.convert_file(conf)
         self.parse_script()
 
     def create_ports(self):
         self.ports.update({0: Pic32cxPort(self.usb_device.serial_number)})
 
     def create_pins(self):
-        enabled_commands = self._enabled_pin_commands()
         for config in self.full_config.get("pins"):
-            if self._skip_disabled_pin(config, enabled_commands):
-                continue
             pin = Pic32cxPin(self, config)
             pin.setPort(self.ports.get(0))
             logger.debug(f"Adding {pin.command}")
